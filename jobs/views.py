@@ -8,6 +8,8 @@ from .models import Job
 from .serializers import JobSerializer
 from .permissions import IsCompanyOwner
 
+from rest_framework.pagination import PageNumberPagination
+
 
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
@@ -15,17 +17,22 @@ def job_list_create_view(request):
     if request.method == 'GET':
         jobs = Job.objects.filter(is_active=True)
 
-        # optional filtering through query params, e.g. ?location=nairobi&job_type=full_time
         location = request.query_params.get('location')
         job_type = request.query_params.get('job_type')
+        search = request.query_params.get('search')
 
         if location:
             jobs = jobs.filter(location__icontains=location)
         if job_type:
             jobs = jobs.filter(job_type=job_type)
+        if search:
+            jobs = jobs.filter(title__icontains=search)
 
-        serializer = JobSerializer(jobs, many=True)
-        return Response(serializer.data)
+        paginator = PageNumberPagination()
+        paginator.page_size = 10
+        result_page = paginator.paginate_queryset(jobs, request)
+        serializer = JobSerializer(result_page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
     if request.method == 'POST':
         if not request.user.is_authenticated:
